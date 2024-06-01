@@ -106,8 +106,6 @@ get("player").new = function(self, player)
 		self.cache[character] = {
 			["player"] = player,
 			["drawings"] = {
-				["box"] = get("new").drawing("Square", { Visible = false }),
-				["boxOutline"] = get("new").drawing("Square", { Visible = false }),
 				["name"] = get("new").drawing("Text", { Visible = false, Center = true}),
 				["health"] = get("new").drawing("Line", { Visible = false }),
 				["healthOutline"] = get("new").drawing("Line", { Visible = false }),
@@ -185,37 +183,23 @@ get("player").update = function(self, character, data)
 
 		if visible and check() then
 			local scale = 1 / (position.Z * math.tan(math.rad(camera.FieldOfView * 0.5)) * 2) * 1000
-			local width, height = math.floor(4.5 * scale), math.floor(6 * scale)
 			local x, y = math.floor(position.X), math.floor(position.Y)
-			local xPosition, yPostion = math.floor(x - width * 0.5), math.floor((y - height * 0.5) + (0.5 * scale))
-
-			drawings.box.Size = Vector2.new(width, height)
-			drawings.box.Position = Vector2.new(xPosition, yPostion)
-			drawings.boxOutline.Size = drawings.box.Size
-			drawings.boxOutline.Position = drawings.box.Position
-
-			drawings.box.Color = color(visuals.boxes.color)
-			drawings.box.Thickness = 1
-			drawings.boxOutline.Color = visuals.boxes.outline.color
-			drawings.boxOutline.Thickness = 3
-
-			drawings.boxOutline.ZIndex = drawings.box.ZIndex - 1
 
 			drawings.name.Text = `[ {player.Name} ]`
 			drawings.name.Size = math.max(math.min(math.abs(12.5 * scale), 12.5), 10)
-			drawings.name.Position = Vector2.new(x, (yPostion - drawings.name.TextBounds.Y) - 2)
+			drawings.name.Position = Vector2.new(x, (y - drawings.name.TextBounds.Y) - 2)
 			drawings.name.Color = color(visuals.names.color)
 			drawings.name.Outline = visuals.names.outline.enabled
 			drawings.name.OutlineColor = visuals.names.outline.color
 
-			drawings.name.ZIndex = drawings.box.ZIndex + 1
+			drawings.name.ZIndex = 2  -- Adjust the Z index if needed
 
 			local healthPercent = 100 / (humanoid.MaxHealth / humanoid.Health)
-		
-			drawings.healthOutline.From = Vector2.new(xPosition - 5, yPostion)
-			drawings.healthOutline.To = Vector2.new(xPosition - 5, yPostion + height)
-			drawings.health.From = Vector2.new(xPosition - 5, (yPostion + height) - 1)
-			drawings.health.To = Vector2.new(xPosition - 5, ((drawings.health.From.Y - ((height / 100) * healthPercent))) + 2)
+
+			drawings.healthOutline.From = Vector2.new(x - 5, y)
+			drawings.healthOutline.To = Vector2.new(x - 5, y + 20)
+			drawings.health.From = Vector2.new(x - 5, (y + 20) - 1)
+			drawings.health.To = Vector2.new(x - 5, ((drawings.health.From.Y - ((20 / 100) * healthPercent))) + 2)
 			drawings.healthText.Text = `[ HP {math.floor(humanoid.Health)} ]`
 			drawings.healthText.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
 			drawings.healthText.Position = Vector2.new(drawings.health.To.X - (drawings.healthText.TextBounds.X + 3), (drawings.health.To.Y - (2 / scale)))
@@ -227,11 +211,11 @@ get("player").update = function(self, character, data)
 			drawings.healthText.Outline = visuals.health.text.outline.enabled
 			drawings.healthText.OutlineColor = visuals.health.outline.color
 
-			drawings.healthOutline.ZIndex = drawings.health.ZIndex - 1
+			drawings.healthOutline.ZIndex = 1  -- Adjust the Z index if needed
 
 			drawings.distance.Text = `[ {math.floor(data.distance)} ]`
 			drawings.distance.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
-			drawings.distance.Position = Vector2.new(x, (yPostion + height) + (drawings.distance.TextBounds.Y * 0.25))
+			drawings.distance.Position = Vector2.new(x, (y + 20) + (drawings.distance.TextBounds.Y * 0.25))
 			drawings.distance.Color = color(visuals.distance.color)
 			drawings.distance.Outline = visuals.distance.outline.enabled
 			drawings.distance.OutlineColor = visuals.distance.outline.color
@@ -244,8 +228,6 @@ get("player").update = function(self, character, data)
 			drawings.weapon.OutlineColor = visuals.weapon.outline.color
 		end
 
-		drawings.box.Visible = (check() and visible and visuals.boxes.enabled)
-		drawings.boxOutline.Visible = (check() and drawings.box.Visible and visuals.boxes.outline.enabled)
 		drawings.name.Visible = (check() and visible and visuals.names.enabled)
 		drawings.health.Visible = (check() and visible and visuals.health.enabled)
 		drawings.healthOutline.Visible = (check() and drawings.health.Visible and visuals.health.outline.enabled)
@@ -284,15 +266,6 @@ declare(features, "visuals", {
 	["teamCheck"] = false,
 	["teamColor"] = true,
 	["renderDistance"] = 2000,
-
-	["boxes"] = {
-		["enabled"] = true,
-		["color"] = Color3.fromRGB(255, 255, 255),
-		["outline"] = {
-			["enabled"] = true,
-			["color"] = Color3.fromRGB(0, 0, 0),
-		}
-	},
 	["names"] = {
 		["enabled"] = true,
 		["color"] = Color3.fromRGB(255, 255, 255),
@@ -347,4 +320,3 @@ end), true)
 declare(get("player"), "removing", players.PlayerRemoving:Connect(function(player)
 	get("player"):remove(player)
 end), true)
-
