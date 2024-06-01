@@ -1,14 +1,18 @@
-local players = game:GetService("Players")
+-- esp [wip]
+
+local players = cloneref(game:GetService("Players"))
 local client = players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local function declare(self, index, value, check)
+getgenv().global = getgenv()
+
+function global.declare(self, index, value, check)
 	if self[index] == nil then
 		self[index] = value
 	elseif check then
 		local methods = { "remove", "Disconnect" }
 
-		for _, method in ipairs(methods) do
+		for _, method in methods do
 			pcall(function()
 				value[method](value)
 			end)
@@ -18,24 +22,56 @@ local function declare(self, index, value, check)
 	return self[index]
 end
 
-local global = {}
-declare(_G, "global", global)
+declare(global, "services", {})
 
-global.services = {}
-
-local function get(service)
-	return global.services[service]
+function global.get(service)
+	return services[service]
 end
 
-local services = {
-	loop = {},
-	player = {},
-	new = {}
-}
+declare(declare(services, "loop", {}), "cache", {})
 
-local function newDrawing(class, properties)
+get("loop").new = function(self, index, func, disabled)
+	if disabled == nil and (func == nil or typeof(func) == "boolean") then
+		disabled = func func = index
+	end
+
+	self.cache[index] = {
+		["enabled"] = (not disabled),
+		["func"] = func,
+		["toggle"] = function(self, boolean)
+			if boolean == nil then
+				self.enabled = not self.enabled
+			else
+				self.enabled = boolean
+			end
+		end,
+		["remove"] = function()
+			self.cache[index] = nil
+		end
+	}
+
+	return self.cache[index]
+end
+
+declare(get("loop"), "connection", cloneref(game:GetService("RunService")).RenderStepped:Connect(function(delta)
+	for _, loop in get("loop").cache do
+		if loop.enabled then
+			local success, result = pcall(function()
+				loop.func(delta)
+			end)
+
+			if not success then
+				warn(result)
+			end
+		end
+	end
+end), true)
+
+declare(services, "new", {})
+
+get("new").drawing = function(class, properties)
 	local drawing = Drawing.new(class)
-	for property, value in pairs(properties) do
+	for property, value in properties do
 		pcall(function()
 			drawing[property] = value
 		end)
@@ -43,15 +79,17 @@ local function newDrawing(class, properties)
 	return drawing
 end
 
-local function findPlayer(self, player)
-	for character, data in pairs(self.cache) do
+declare(declare(services, "player", {}), "cache", {})
+
+get("player").find = function(self, player)
+	for character, data in self.cache do
 		if data.player == player then
 			return character
 		end
 	end
 end
 
-local function checkPlayer(self, player)
+get("player").check = function(self, player)
 	local success, check = pcall(function()
 		local character = player:IsA("Player") and player.Character or player
 		local children = { character.Humanoid, character.HumanoidRootPart }
@@ -62,20 +100,18 @@ local function checkPlayer(self, player)
 	return success and check
 end
 
-local function newPlayer(self, player)
+get("player").new = function(self, player)
 	local function cache(character)
-		print("Caching", character)
+		print("caching", character)
 		self.cache[character] = {
-			player = player,
-			drawings = {
-				name = newDrawing("Text", { Visible = false, Center = true }),
-				health = newDrawing("Line", { Visible = false }),
-				healthOutline = newDrawing("Line", { Visible = false }),
-				healthText = newDrawing("Text", { Visible = false, Center = false }),
-				distance = newDrawing("Text", { Visible = false, Center = true }),
-				weapon = newDrawing("Text", { Visible = false, Center = true }),
-				box = newDrawing("Square", { Visible = false }),
-				boxOutline = newDrawing("Square", { Visible = false }),
+			["player"] = player,
+			["drawings"] = {
+				["name"] = get("new").drawing("Text", { Visible = false, Center = true}),
+				["health"] = get("new").drawing("Line", { Visible = false }),
+				["healthOutline"] = get("new").drawing("Line", { Visible = false }),
+				["healthText"] = get("new").drawing("Text", { Visible = false, Center = false}),
+				["distance"] = get("new").drawing("Text", { Visible = false, Center = true}),
+				["weapon"] = get("new").drawing("Text", { Visible = false, Center = true}),
 			}
 		}
 	end
@@ -84,40 +120,35 @@ local function newPlayer(self, player)
 		if self:check(character) then
 			cache(character)
 		else
-			local listener
-			listener = character.ChildAdded:Connect(function()
+			local listener; listener = character.ChildAdded:Connect(function()
 				if self:check(character) then
-					cache(character)
-					listener:Disconnect()
+					cache(character) listener:Disconnect()
 				end
 			end)
 		end
 	end
 
-	if player.Character then
-		check(player.Character)
-	end
+	if player.Character then check(player.Character) end
 	player.CharacterAdded:Connect(check)
 end
 
-local function removePlayer(self, player)
-	print("Removing", player)
+get("player").remove = function(self, player)
+	print("removing", player)
 	if player:IsA("Player") then
 		local character = self:find(player)
 		if character then
 			self:remove(character)
 		end
 	else
-		local drawings = self.cache[player].drawings
-		self.cache[player] = nil
+		local drawings = self.cache[player].drawings self.cache[player] = nil
 
-		for _, drawing in pairs(drawings) do
+		for _, drawing in drawings do
 			drawing:Remove()
 		end
 	end
 end
 
-local function updatePlayer(self, character, data)
+get("player").update = function(self, character, data)
 	if not self:check(character) then
 		self:remove(character)
 	end
@@ -128,23 +159,18 @@ local function updatePlayer(self, character, data)
 	local drawings = data.drawings
 
 	if self:check(client) then
-		data.distance = (client.Character.HumanoidRootPart.Position - root.Position).Magnitude
+		data.distance = (client.Character.HumanoidRootPart.CFrame.Position - root.CFrame.Position).Magnitude
 	end
 
 	local weapon = character:FindFirstChildWhichIsA("Tool") or "none"
 
 	task.spawn(function()
-		local position, visible = camera:WorldToViewportPoint(root.Position)
+		local position, visible = camera:WorldToViewportPoint(root.CFrame.Position)
 
-		local visuals = global.features.visuals
+		local visuals = features.visuals
 
 		local function check()
-			local team
-			if visuals.teamCheck then
-				team = player.Team ~= client.Team
-			else
-				team = true
-			end
+			local team; if visuals.teamCheck then team = player.Team ~= client.Team else team = true end
 			return visuals.enabled and data.distance and data.distance <= visuals.renderDistance and team
 		end
 
@@ -159,14 +185,14 @@ local function updatePlayer(self, character, data)
 			local scale = 1 / (position.Z * math.tan(math.rad(camera.FieldOfView * 0.5)) * 2) * 1000
 			local x, y = math.floor(position.X), math.floor(position.Y)
 
-			drawings.name.Text = "[ " .. player.Name .. " ]"
+			drawings.name.Text = `[ {player.Name} ]`
 			drawings.name.Size = math.max(math.min(math.abs(12.5 * scale), 12.5), 10)
 			drawings.name.Position = Vector2.new(x, (y - drawings.name.TextBounds.Y) - 2)
 			drawings.name.Color = color(visuals.names.color)
 			drawings.name.Outline = visuals.names.outline.enabled
 			drawings.name.OutlineColor = visuals.names.outline.color
 
-			drawings.name.ZIndex = 2
+			drawings.name.ZIndex = 2  -- Adjust the Z index if needed
 
 			local healthPercent = 100 / (humanoid.MaxHealth / humanoid.Health)
 
@@ -174,7 +200,7 @@ local function updatePlayer(self, character, data)
 			drawings.healthOutline.To = Vector2.new(x - 5, y + 20)
 			drawings.health.From = Vector2.new(x - 5, (y + 20) - 1)
 			drawings.health.To = Vector2.new(x - 5, ((drawings.health.From.Y - ((20 / 100) * healthPercent))) + 2)
-			drawings.healthText.Text = "[ HP " .. math.floor(humanoid.Health) .. " ]"
+			drawings.healthText.Text = `[ HP {math.floor(humanoid.Health)} ]`
 			drawings.healthText.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
 			drawings.healthText.Position = Vector2.new(drawings.health.To.X - (drawings.healthText.TextBounds.X + 3), (drawings.health.To.Y - (2 / scale)))
 
@@ -185,113 +211,112 @@ local function updatePlayer(self, character, data)
 			drawings.healthText.Outline = visuals.health.text.outline.enabled
 			drawings.healthText.OutlineColor = visuals.health.outline.color
 
-			drawings.distance.Text = "[ " .. math.floor(data.distance) .. " ]"
+			drawings.healthOutline.ZIndex = 1  -- Adjust the Z index if needed
+
+			drawings.distance.Text = `[ {math.floor(data.distance)} ]`
 			drawings.distance.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
 			drawings.distance.Position = Vector2.new(x, (y + 20) + (drawings.distance.TextBounds.Y * 0.25))
 			drawings.distance.Color = color(visuals.distance.color)
 			drawings.distance.Outline = visuals.distance.outline.enabled
 			drawings.distance.OutlineColor = visuals.distance.outline.color
-
-			drawings.weapon.Text = "[ " .. weapon .. " ]"
+			
+			drawings.weapon.Text = `[ {weapon} ]`
 			drawings.weapon.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
-			drawings.weapon.Position = visuals.distance.enabled and Vector2.new(drawings.distance.Position.X, drawings.distance.Position.Y + (drawings.weapon.TextBounds.Y * 0.75)) or drawings.distance.Position
+			drawings.weapon.Position = visuals.distance.enabled and Vector2.new(drawings.distance.Position.x, drawings.distance.Position.Y + (drawings.weapon.TextBounds.Y * 0.75)) or drawings.distance.Position
 			drawings.weapon.Color = color(visuals.weapon.color)
 			drawings.weapon.Outline = visuals.weapon.outline.enabled
 			drawings.weapon.OutlineColor = visuals.weapon.outline.color
-
-			local width, height = math.floor(4.5 * scale), math.floor(6 * scale)
-			local xPosition, yPosition = math.floor(x - width * 0.5), math.floor((y - height * 0.5) + (0.5 * scale))
-
-			drawings.box.Size = Vector2.new(width, height)
-			drawings.box.Position = Vector2.new(xPosition, yPosition)
-			drawings.boxOutline.Size = drawings.box.Size
-			drawings.boxOutline.Position = drawings.box.Position
-
-			drawings.box.Color = color(visuals.boxes.color)
-			drawings.box.Thickness = 1
-			drawings.boxOutline.Color = visuals.boxes.outline.color
-			drawings.boxOutline.Thickness = 3
-
-			drawings.boxOutline.ZIndex = 1
-
-			drawings.box.Visible = (check() and visible and visuals.boxes.enabled)
-			drawings.boxOutline.Visible = (check() and drawings.box.Visible and visuals.boxes.outline.enabled)
-			drawings.name.Visible = (check() and visible and visuals.names.enabled)
-			drawings.health.Visible = (check() and visible and visuals.health.enabled)
-			drawings.healthOutline.Visible = (check() and drawings.health.Visible and visuals.health.outline.enabled)
-			drawings.healthText.Visible = (check() and drawings.health.Visible and visuals.health.text.enabled)
-			drawings.distance.Visible = (check() and visible and visuals.distance.enabled)
-			drawings.weapon.Visible = (check() and visible and visuals.weapon.enabled)
 		end
+
+		drawings.name.Visible = (check() and visible and visuals.names.enabled)
+		drawings.health.Visible = (check() and visible and visuals.health.enabled)
+		drawings.healthOutline.Visible = (check() and drawings.health.Visible and visuals.health.outline.enabled)
+		drawings.healthText.Visible = (check() and drawings.health.Visible and visuals.health.text.enabled)
+		drawings.distance.Visible = (check() and visible and visuals.distance.enabled)
+		drawings.weapon.Visible = (check() and visible and visuals.weapon.enabled)
 	end)
 end
 
-global.features = {
-	visuals = {
-		enabled = true,
-		teamCheck = false,
-		teamColor = true,
-		renderDistance = 2000,
-		boxes = {
-			enabled = true,
-			color = Color3.fromRGB(255, 255, 255),
-			outline = {
-				enabled = true,
-				color = Color3.fromRGB(0, 0, 0),
-			},
+declare(get("player"), "loop", get("loop"):new(function ()
+	for character, data in get("player").cache do
+		get("player"):update(character, data)
+	end
+end), true)
+
+declare(global, "features", {})
+
+features.toggle = function(self, feature, boolean)
+	if self[feature] then
+		if boolean == nil then
+			self[feature].enabled = not self[feature].enabled
+		else
+			self[feature].enabled = boolean
+		end
+
+		if self[feature].toggle then
+			task.spawn(function()
+				self[feature]:toggle()
+			end)
+		end
+	end
+end
+
+declare(features, "visuals", {
+	["enabled"] = true,
+	["teamCheck"] = false,
+	["teamColor"] = true,
+	["renderDistance"] = 2000,
+	["names"] = {
+		["enabled"] = true,
+		["color"] = Color3.fromRGB(255, 255, 255),
+		["outline"] = {
+			["enabled"] = true,
+			["color"] = Color3.fromRGB(0, 0, 0),
 		},
-		names = {
-			enabled = true,
-			color = Color3.fromRGB(255, 255, 255),
-			outline = {
-				enabled = true,
-				color = Color3.fromRGB(0, 0, 0),
-			},
+	},
+	["health"] = {
+		["enabled"] = true,
+		["color"] = Color3.fromRGB(0, 255, 0),
+		["colorLow"] = Color3.fromRGB(255, 0, 0),
+		["outline"] = {
+			["enabled"] = true,
+			["color"] = Color3.fromRGB(0, 0, 0)
 		},
-		health = {
-			enabled = true,
-			color = Color3.fromRGB(0, 255, 0),
-			colorLow = Color3.fromRGB(255, 0, 0),
-			outline = {
-				enabled = true,
-				color = Color3.fromRGB(0, 0, 0)
-			},
-			text = {
-				enabled = true,
-				outline = {
-					enabled = true,
-				},
-			}
-		},
-		distance = {
-			enabled = true,
-			color = Color3.fromRGB(255, 255, 255),
-			outline = {
-				enabled = true,
-				color = Color3.fromRGB(0, 0, 0),
-			},
-		},
-		weapon = {
-			enabled = true,
-			color = Color3.fromRGB(255, 255, 255),
-			outline = {
-				enabled = true,
-				color = Color3.fromRGB(0, 0, 0),
+		["text"] = {
+			["enabled"] = true,
+			["outline"] = {
+				["enabled"] = true,
 			},
 		}
+	},
+	["distance"] = {
+		["enabled"] = true,
+		["color"] = Color3.fromRGB(255, 255, 255),
+		["outline"] = {
+			["enabled"] = true,
+			["color"] = Color3.fromRGB(0, 0, 0),
+		},
+	},
+	["weapon"] = {
+		["enabled"] = true,
+		["color"] = Color3.fromRGB(255, 255, 255),
+		["outline"] = {
+			["enabled"] = true,
+			["color"] = Color3.fromRGB(0, 0, 0),
+		},
 	}
-}
+})
 
-for _, player in ipairs(players:GetPlayers()) do
+for _, player in players:GetPlayers() do
 	if player ~= client and not get("player"):find(player) then
 		get("player"):new(player)
 	end
 end
 
-get("player").added = players.PlayerAdded:Connect(function(player)
+declare(get("player"), "added", players.PlayerAdded:Connect(function(player)
 	get("player"):new(player)
-end)
+end), true)
 
-get("player").removing = players.PlayerRemoving:Connect(function(player)
+declare(get("player"), "removing", players.PlayerRemoving:Connect(function(player)
 	get("player"):remove(player)
-end)
+end), true)
