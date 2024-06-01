@@ -185,8 +185,6 @@ local function updatePlayer(self, character, data)
 			drawings.healthText.Outline = visuals.health.text.outline.enabled
 			drawings.healthText.OutlineColor = visuals.health.outline.color
 
-			drawings.healthOutline.ZIndex = 1
-
 			drawings.distance.Text = "[ " .. math.floor(data.distance) .. " ]"
 			drawings.distance.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
 			drawings.distance.Position = Vector2.new(x, (y + 20) + (drawings.distance.TextBounds.Y * 0.25))
@@ -196,8 +194,7 @@ local function updatePlayer(self, character, data)
 
 			drawings.weapon.Text = "[ " .. weapon .. " ]"
 			drawings.weapon.Size = math.max(math.min(math.abs(11 * scale), 11), 10)
-			drawings.weapon.Position = visuals.distance.enabled and Vector2.new(drawings.distance.Position.X,
-            drawings.weapon.Position.Y + (drawings.weapon.TextBounds.Y * 0.75)) or drawings.distance.Position
+			drawings.weapon.Position = visuals.distance.enabled and Vector2.new(drawings.distance.Position.X, drawings.distance.Position.Y + (drawings.weapon.TextBounds.Y * 0.75)) or drawings.distance.Position
 			drawings.weapon.Color = color(visuals.weapon.color)
 			drawings.weapon.Outline = visuals.weapon.outline.enabled
 			drawings.weapon.OutlineColor = visuals.weapon.outline.color
@@ -207,23 +204,17 @@ local function updatePlayer(self, character, data)
 
 			drawings.box.Size = Vector2.new(width, height)
 			drawings.box.Position = Vector2.new(xPosition, yPosition)
-			drawings.boxFilled.Size = drawings.box.Size
-			drawings.boxFilled.Position = drawings.box.Position
 			drawings.boxOutline.Size = drawings.box.Size
 			drawings.boxOutline.Position = drawings.box.Position
 
 			drawings.box.Color = color(visuals.boxes.color)
 			drawings.box.Thickness = 1
-			drawings.boxFilled.Color = color(visuals.boxes.filled.color)
-			drawings.boxFilled.Transparency = visuals.boxes.filled.transparency
 			drawings.boxOutline.Color = visuals.boxes.outline.color
 			drawings.boxOutline.Thickness = 3
 
-			drawings.boxOutline.ZIndex = drawings.box.ZIndex - 1
-			drawings.boxFilled.ZIndex = drawings.boxOutline.ZIndex - 1
+			drawings.boxOutline.ZIndex = 1
 
 			drawings.box.Visible = (check() and visible and visuals.boxes.enabled)
-			drawings.boxFilled.Visible = (check() and drawings.box.Visible and visuals.boxes.filled.enabled)
 			drawings.boxOutline.Visible = (check() and drawings.box.Visible and visuals.boxes.outline.enabled)
 			drawings.name.Visible = (check() and visible and visuals.names.enabled)
 			drawings.health.Visible = (check() and visible and visuals.health.enabled)
@@ -247,11 +238,6 @@ global.features = {
 			outline = {
 				enabled = true,
 				color = Color3.fromRGB(0, 0, 0),
-			},
-			filled = {
-				enabled = true,
-				color = Color3.fromRGB(255, 255, 255),
-				transparency = 0.25
 			},
 		},
 		names = {
